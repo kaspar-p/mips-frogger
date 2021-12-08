@@ -1,0 +1,8 @@
+# Ignore git folders
+.git
+.gitattributes
+
+# Ignore Python cache
+__pycache__/
+.idea/
+.DS_Store
