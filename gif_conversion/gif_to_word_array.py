@@ -104,7 +104,7 @@ def main(input_file_path: str, output_file_path: str):
 
 
 if __name__ == "__main__":
-    file_name = f"winScreen"
-    in_path = f"assets/gif/screens/{file_name}.gif"
-    out_path = f"assets/kmp/screens/{file_name}.kmp"
+    file_name = f"truck"
+    in_path = f"assets/gif/sprites/{file_name}.gif"
+    out_path = f"assets/kmp/sprites/{file_name}.kmp"
     main(in_path, out_path)

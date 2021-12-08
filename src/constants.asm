@@ -116,5 +116,5 @@
 .eqv turtleDirection -1
 
 # Configure player constants
-.eqv pinkPlayerInitialPosition 28800 # 57600
-.eqv bluePlayerInitialPosition 28832 # 57600
+.eqv pinkPlayerInitialPosition 57600
+.eqv bluePlayerInitialPosition 57632
