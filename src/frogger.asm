@@ -13,13 +13,29 @@
 .text
 .globl main
 main:
+.globl RESET
 RESET:
-START:
+.globl START
+START:	
+	la $t0, bluePlayerLivesRemaining
+	la $t1, pinkPlayerLivesRemaining
+	li $t2, maxHearts
+	sw $t2, ($t0)
+	sw $t2, ($t1)
+	
+	la $t0, bluePlayerWon
+	la $t1, pinkPlayerWon
+	sw $zero, ($t0)
+	sw $zero, ($t0)
+	
 	# Initialize sprites
 	jal INITIALIZE_SPRITES
 	
 	# Initialize the animation arrays for ease of animation
 	jal INITIALIZE_ANIMATION_ARRAYS
+	
+	# Initialize the screens like starting screen, gameover screen, and win screen
+	jal INITIALIZE_SCREENS
 	
 	# Initialize playerPosition for blue and pink
 	la $t0, bluePlayerPosition
@@ -104,6 +120,36 @@ START:
 	sw $t1 ($t0)				# Save movementAmountUp = -(movementAmountDown)
 	
 	j GAME_LOOP
+
+INITIALIZE_SCREENS:
+	push
+	
+	la $a0, startScreenImageFilename
+	la $a1, startScreenImage
+	li $a2, bufferSize
+	jal LOAD_IMAGE_INTO_ARRAY
+	
+	la $a0, winScreenImageFilename
+	la $a1, winScreenImage
+	li $a2, bufferSize
+	jal LOAD_IMAGE_INTO_ARRAY
+	
+	la $a0, gameOverBothScreenImageFilename
+	la $a1, gameOverBothScreenImage
+	li $a2, bufferSize
+	jal LOAD_IMAGE_INTO_ARRAY
+	
+	la $a0, gameOverBlueScreenImageFilename
+	la $a1, gameOverBlueScreenImage
+	li $a2, bufferSize
+	jal LOAD_IMAGE_INTO_ARRAY
+	
+	la $a0, gameOverPinkScreenImageFilename
+	la $a1, gameOverPinkScreenImage
+	li $a2, bufferSize
+	jal LOAD_IMAGE_INTO_ARRAY
+	
+	return
 
 INITIALIZE_ANIMATION_ARRAYS:
 	push

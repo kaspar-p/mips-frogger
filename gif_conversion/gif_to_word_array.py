@@ -5,7 +5,7 @@
 """
 import sys
 from typing import BinaryIO
-from gif_conversion.gif import lzw_decompress
+from gif_conversion.gif import lzw_decompress, Gif, ImageBlock
 
 
 def little_endian(bytes_to_add: list[int]):
@@ -83,23 +83,17 @@ def main(input_file_path: str, output_file_path: str):
     # Compute color table
     table = create_color_table(data)
 
-    # Read the header
-    image_descriptor = data.find(0x2C)
-    start_index = image_descriptor + 12
-    size_lzw_colors = data[image_descriptor + 10]
-    num_pixels = data[image_descriptor + 11]
-    end_index = start_index + num_pixels
+    # Read the GIF file
+    gif_file = Gif(input_file_path)
 
-    # Read the encoded data
-    lzw_encoded = data[start_index:end_index]
-
-    # Decompress the compressed bytes into their color indices
-    decompressed_color_data = lzw_decompress(lzw_encoded, size_lzw_colors)
     input_file.close()
 
     rgb_format = []
-    for color_index in decompressed_color_data:
-        rgb_format.extend(table[color_index])
+    for block in gif_file.blocks:
+        if isinstance(block, ImageBlock):
+            decompressed_block = block.decompress()
+            for color_index in decompressed_block:
+                rgb_format.extend(table[color_index])
 
     # Write GIF data to a different file
     output = open(output_file_path, "wb")
@@ -110,7 +104,7 @@ def main(input_file_path: str, output_file_path: str):
 
 
 if __name__ == "__main__":
-    file_name = f""
-    in_path = f"assets/gif/{file_name}.gif"
-    out_path = f"assets/kmp/{file_name}.kmp"
+    file_name = f"winScreen"
+    in_path = f"assets/gif/screens/{file_name}.gif"
+    out_path = f"assets/kmp/screens/{file_name}.kmp"
     main(in_path, out_path)

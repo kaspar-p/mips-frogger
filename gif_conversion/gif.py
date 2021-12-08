@@ -76,7 +76,7 @@ __all__ = [
 # Error classes
 # ================================================================
 class GifFormatError(RuntimeError):
-    '''Raised when invalid format is encountered'''
+    """Raised when invalid format is encountered"""
     pass
 
 
@@ -84,7 +84,7 @@ class GifFormatError(RuntimeError):
 # Bit-level operations
 # ================================================================
 class BitReader(object):
-    '''Reads bits from a byte string'''
+    """Reads bits from a byte string"""
 
     __slots__ = [
         "_str",
@@ -96,7 +96,7 @@ class BitReader(object):
     # Construction
     # ------------------------------------------------
     def __init__(self, byte_string):
-        '''Initialize the reader with a complete byte string'''
+        """Initialize the reader with a complete byte string"""
         if not isinstance(byte_string, bytes):
             raise TypeError("Requires bytelike object")
         self._str = byte_string
@@ -248,14 +248,14 @@ def block_join(raw_bytes):
 # LZW compression algorithms
 # ================================================================
 def lzw_decompress(raw_bytes, lzw_min):
-    '''Decompress the LZW data and yields output'''
+    """Decompress the LZW data and yields output"""
 
     # Initialize streams
     code_in = BitReader(raw_bytes)
     idx_out = []
     # Set up bit reading
     bit_size = lzw_min + 1
-    bit_inc = (1 << (bit_size)) - 1
+    bit_inc = (1 << bit_size) - 1
     # Initialize special codes
     CLEAR = 1 << lzw_min
     END = CLEAR + 1
@@ -269,7 +269,7 @@ def lzw_decompress(raw_bytes, lzw_min):
         if code_id == CLEAR:
             # Reset size readers
             bit_size = lzw_min + 1
-            bit_inc = (1 << (bit_size)) - 1
+            bit_inc = (1 << bit_size) - 1
             code_last = -1
             # Clear the code table
             code_table = [-1] * code_table_len

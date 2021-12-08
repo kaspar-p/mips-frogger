@@ -10,6 +10,104 @@
 .globl RENDER
 RENDER:
 	push
+	lw $t0, gameState
+	beq $t0, 0, RENDER_STATE_0
+	beq $t0, 1, RENDER_STATE_1
+	beq $t0, 2, RENDER_STATE_2
+	beq $t0, 3, RENDER_STATE_3
+	beq $t0, 4, RENDER_STATE_4
+	beq $t0, 5, RENDER_STATE_5
+	
+	RENDER_STATE_0:
+		jal RENDER_START_SCREEN
+		j RENDER_STATE_DONE
+	RENDER_STATE_1:
+		jal RENDER_GAME
+		j RENDER_STATE_DONE
+	RENDER_STATE_2:
+		jal RENDER_BLUE_WON_SCREEN
+		j RENDER_STATE_DONE
+	RENDER_STATE_3:
+		jal RENDER_PINK_WON_SCREEN
+		j RENDER_STATE_DONE
+	RENDER_STATE_4:
+		jal RENDER_BOTH_WON_SCREEN
+		j RENDER_STATE_DONE
+	RENDER_STATE_5:
+		jal RENDER_BOTH_LOST_SCREEN
+		j RENDER_STATE_DONE
+	RENDER_STATE_DONE:
+	
+	jal RENDER_BUFFER
+	
+	return
+
+RENDER_START_SCREEN:
+	push
+	
+	la $a0, startScreenImage
+	jal COPY_SCREEN_TO_FRAME_BUFFER
+	
+	return
+
+RENDER_PINK_WON_SCREEN:
+	push
+	
+	la $a0, gameOverPinkScreenImage
+	jal COPY_SCREEN_TO_FRAME_BUFFER
+	
+	return
+
+RENDER_BLUE_WON_SCREEN:
+	push
+	
+	la $a0, gameOverBlueScreenImage
+	jal COPY_SCREEN_TO_FRAME_BUFFER
+	
+	return
+
+RENDER_BOTH_WON_SCREEN:
+	push
+	
+	la $a0, winScreenImageFilename
+	jal COPY_SCREEN_TO_FRAME_BUFFER
+	
+	return
+	
+RENDER_BOTH_LOST_SCREEN:
+	push
+	
+	la $a0, gameOverBothScreenImage
+	jal COPY_SCREEN_TO_FRAME_BUFFER
+	
+	return
+
+# A helper function to copy the contents of an array (screen-sized) to the frameBuffer
+#	PARAMS:
+#		$a0 stores the index of the beginning of the array to copy
+COPY_SCREEN_TO_FRAME_BUFFER:
+	push
+	
+	la $t9, frameBuffer		# Load the frame buffer
+	
+	li $t0, 0			# The loop counter
+	COPY_SCREEN_LOOP:
+		beq $t0, bufferSize, COPY_SCREEN_END
+		
+		add $t1, $t0, $a0	# Index of pixel in screen array
+		lw $t1, ($t1)		# Color of pixel in screen array
+		
+		add $t2, $t0, $t9	# Index of pixel in frame buffer
+		sw $t1, ($t2)		# Copy the color from screen array into frame buffer
+		
+		addiu $t0, $t0, 4
+		j COPY_SCREEN_LOOP
+	COPY_SCREEN_END:
+	
+	return
+
+RENDER_GAME:
+	push
 	
 	# Draw score region
 	lw $a0, scoreRegionStart		
@@ -53,25 +151,31 @@ RENDER:
 	# Draw all NPCs
 	jal DRAW_NPCS
 	
-	# Draw the player
-	la $a0, bluePlayerAnimationAddressArray
-	lw $a1, bluePlayerPosition
-	lw $a2, bluePlayerMoving
-	li $a3, 0
-	jal DRAW_ANIMATED_SPRITE
+	lw $t0, bluePlayerLivesRemaining
+	beqz $t0, SKIP_RENDER_BLUE_PLAYER
 	
-	# Draw the player
-	la $a0, pinkPlayerAnimationAddressArray
-	lw $a1, pinkPlayerPosition
-	lw $a2, pinkPlayerMoving
-	li $a3, 1
-	jal DRAW_ANIMATED_SPRITE
+		# Draw the blue player
+		la $a0, bluePlayerAnimationAddressArray
+		lw $a1, bluePlayerPosition
+		lw $a2, bluePlayerMoving
+		li $a3, 0
+		jal DRAW_ANIMATED_SPRITE
 	
-	### RENDER THE BUFFER
-	jal RENDER_BUFFER
+	SKIP_RENDER_BLUE_PLAYER:
+	
+	lw $t0, pinkPlayerLivesRemaining
+	beqz $t0, SKIP_RENDER_PINK_PLAYER
+		
+		# Draw the pink player
+		la $a0, pinkPlayerAnimationAddressArray
+		lw $a1, pinkPlayerPosition
+		lw $a2, pinkPlayerMoving
+		li $a3, 1
+		jal DRAW_ANIMATED_SPRITE
+		
+	SKIP_RENDER_PINK_PLAYER:
 	
 	return
-
 
 # A function to draw a single animated sprite.
 #	NOTE
@@ -164,7 +268,6 @@ DRAW_8_BY_8_SPRITE:
 	push
 	
 	la $t9, frameBuffer
-	#move $t9, $gp
 	add $t9, $a0, $t9
 	
 	li $t8, width

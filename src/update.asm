@@ -11,29 +11,208 @@
 .globl UPDATE
 UPDATE: 
 	push
+	
+	lw $t0, gameState
+	beq $t0, 0, UPDATE_STATE_0
+	beq $t0, 1, UPDATE_STATE_1
+	beq $t0, 2, UPDATE_STATE_2
+	beq $t0, 3, UPDATE_STATE_3
+	beq $t0, 4, UPDATE_STATE_4
+	beq $t0, 5, UPDATE_STATE_5
+	
+	j EXIT
+	
+	UPDATE_STATE_0:
+		jal CHECK_FOR_START_BUTTON_PRESS
+		j END_UPDATE_STATE
+	UPDATE_STATE_1:
+		jal UPDATE_GAME
+		j END_UPDATE_STATE
+	UPDATE_STATE_2:
+	UPDATE_STATE_3:
+	UPDATE_STATE_4:
+	UPDATE_STATE_5:
+		jal CHECK_FOR_REPLAY_GAME_BUTTON_PRESS
+		j END_UPDATE_STATE
+	END_UPDATE_STATE:
+	
+	return
+
+UPDATE_GAME:
+	push
 	allocate 2
 	
-	# RETURNS:
-	# 	$v0 == 0 if player not on log or turtle
-	# 	$v0 == 1 if on log
-	# 	$v0 == 2 if on turtle
-	li $a0, 0
-	jal CHECK_AND_HANDLE_COLLISIONS
-	sw $v0, ($sp)
+	lw $t0, bluePlayerLivesRemaining
+	beq $t0, 0, SKIP_BLUE_INTERACTIONS
+		# Handle blue interactions
+		li $a0, 0
+		jal CHECK_AND_HANDLE_COLLISIONS		# Returns $v0 == 0 if player not on log/turtle, == 1 if on log, == 2 if on turtle
+		CHECK_BLUE_COLLISIONS_DONE:		# Break section if blue player dies
+		sw $v0, ($sp)
 	
-	jal CHECK_AND_HANDLE_BLUE_KEYPRESS
+	SKIP_BLUE_INTERACTIONS:
+			
+	lw $t0, pinkPlayerLivesRemaining
+	beq $t0, 0, SKIP_PINK_INTERACTIONS
+		
+		# Handle pink interactions
+		li $a0, 1
+		jal CHECK_AND_HANDLE_COLLISIONS		# Returns $v0 == 0 if player not on log/turtle, == 1 if on log, == 2 if on turtle
+		CHECK_PINK_COLLISIONS_DONE:		# Break section if pink player dies
+		sw $v0, 4($sp)
 	
-	li $a0, 1
-	jal CHECK_AND_HANDLE_COLLISIONS
-	sw $v0, 4($sp)
+	SKIP_PINK_INTERACTIONS:
 	
-	jal CHECK_AND_HANDLE_PINK_KEYPRESS
+	
+	jal CHECK_AND_HANDLE_KEYPRESSES		# Check keypresses for pink and blue
 	
 	lw $v0, ($sp)
 	lw $v1, 4($sp)
 	jal UPDATE_NPC_POSITIONS
 	
+	jal CHECK_IF_PLAYER_IN_END_ZONE
+	
 	free 2
+	return
+
+CHECK_IF_PLAYER_IN_END_ZONE:
+	push
+	
+	# Check blue player
+	lw $t0, bluePlayerPosition
+	lw $t1, waterRegionStart
+	blt $t0, $t1, LESS_THAN_WATER_START_BLUE
+	j NOT_IN_END_ZONE_BLUE
+	LESS_THAN_WATER_START_BLUE:
+		lw $t1, endingRegionStart
+		bge $t0, $t1, WITHIN_GOAL_BOUNDS_BLUE
+		j NOT_IN_END_ZONE_BLUE
+		WITHIN_GOAL_BOUNDS_BLUE:
+			la $t0, bluePlayerWon
+			li $t1, 1
+			sw $t1, ($t0)
+	
+	NOT_IN_END_ZONE_BLUE:
+	
+	lw $t0, pinkPlayerPosition
+	lw $t1, waterRegionStart
+	blt $t0, $t1, LESS_THAN_WATER_START_PINK
+	j NOT_IN_END_ZONE_PINK
+	LESS_THAN_WATER_START_PINK:
+		lw $t1, endingRegionStart
+		bge $t0, $t1, WITHIN_GOAL_BOUNDS_PINK
+		j NOT_IN_END_ZONE_PINK
+		WITHIN_GOAL_BOUNDS_PINK:
+			la $t0, pinkPlayerWon
+			li $t1, 1
+			sw $t1, ($t0)
+	
+	NOT_IN_END_ZONE_PINK:
+	
+	### CHECK FOR ENDING STATES
+	lw $t0, bluePlayerWon
+	lw $t1, pinkPlayerWon
+	lw $t2, bluePlayerLivesRemaining
+	lw $t3, pinkPlayerLivesRemaining
+	
+	beq $t0, 1, BLUE_PLAYER_WON
+	j BLUE_PLAYER_DIDNT_WIN
+	BLUE_PLAYER_WON:
+		beq $t1, 1, SET_GAME_STATE_BOTH_WON
+		beq $t3, 0, SET_GAME_STATE_BLUE_WON_PINK_LOST
+		j NOT_IN_END_STATE
+	BLUE_PLAYER_DIDNT_WIN:
+		beq $t1, 1, PINK_PLAYER_WON
+		j PINK_PLAYER_DIDNT_WIN
+		PINK_PLAYER_WON:
+			beq $t2, 0, SET_GAME_STATE_PINK_WON_BLUE_LOST
+			j NOT_IN_END_STATE
+		PINK_PLAYER_DIDNT_WIN:
+			beq $t2, 0, BLUE_PLAYER_DIED
+			j NOT_IN_END_STATE
+			BLUE_PLAYER_DIED:
+				beq $t3, 0, SET_GAME_STATE_BOTH_LOST
+			j NOT_IN_END_STATE
+	NOT_IN_END_STATE:
+	
+	return
+
+SET_GAME_STATE_BOTH_LOST:
+	push
+	
+	la $t0, gameState
+	li $t1, 5
+	sw $t1 ($t0)
+	
+	j main
+	
+	return
+
+SET_GAME_STATE_PINK_WON_BLUE_LOST:
+	push
+	
+	la $t0, gameState
+	li $t1, 3
+	sw $t1 ($t0)
+	
+	j main
+	
+	return
+
+SET_GAME_STATE_BLUE_WON_PINK_LOST:
+	push
+	
+	la $t0, gameState
+	li $t1, 2
+	sw $t1 ($t0)
+	
+	j main
+	
+	return
+
+SET_GAME_STATE_BOTH_WON:
+	push
+	
+	la $t0, gameState
+	li $t1, 4
+	sw $t1 ($t0)
+	
+	j main
+	
+	return
+
+CHECK_FOR_REPLAY_GAME_BUTTON_PRESS:
+	push
+	
+	# Check for keypress
+	lw $t8, 0xffff0000
+	beq $t8, 0, USER_SELECTED_REPLAY_DONE
+	USER_SELECTED_REPLAY:
+		lw $t2, 0xffff0004
+		
+		bne $t2, 0x72, USER_SELECTED_REPLAY_DONE	# if the user pressed 'r'
+			la $t0, gameState
+			li $t1, 1
+			sw $t1, ($t0)				# Set gameState = 1 meaning start the regular game
+			j main
+	USER_SELECTED_REPLAY_DONE:
+	
+	return
+
+CHECK_FOR_START_BUTTON_PRESS:
+	push
+	
+	# Check for keypress
+	lw $t8, 0xffff0000
+	beq $t8, 0, USER_STARTED_DONE
+	USER_STARTED_GAME:
+		la $t0, gameState
+		li $t1, 1
+		sw $t1, ($t0)		# Set gameState = 1 meaning start the regular game
+		li $t0, 0
+		j START
+	USER_STARTED_DONE:
+	
 	return
 
 # A function to update the positions of all of the NPCs
@@ -62,7 +241,7 @@ UPDATE_NPC_POSITIONS:
 	li $a2, truckDirection
 	la $a3, truckVelCounter
 	jal UPDATE_SINGLE_TYPE_OF_OBJECT
-	
+
 	# For each log, update the position and check collision against wall
 	li $v0, waterObjectsOfType
 	la $a0, logPositionsArray
@@ -78,25 +257,26 @@ UPDATE_NPC_POSITIONS:
 		# Check if blue player was on
 		lw $v0, ($sp)					# Load the old $v0 out of stack
 		beq $v0, 1, ACTUALLY_MOVE_BLUE_PLAYER_WITH_LOG
-		j FINISH_LOG_CHECK
+		j DONT_MOVE_BLUE_PLAYER_WITH_LOG
 		ACTUALLY_MOVE_BLUE_PLAYER_WITH_LOG:
 			move $a0, $v0
 			li $a1, 0
 			jal MOVE_PLAYER_WITH_WATER_VEHICLE
 			li $v0, 0
+		DONT_MOVE_BLUE_PLAYER_WITH_LOG:
 		
 		# Check if pink player was on
 		lw $v0, 4($sp)					# Load old $v0 out of stack
 		beq $v0, 1, ACTUALLY_MOVE_PINK_PLAYER_WITH_LOG
-		j FINISH_LOG_CHECK
+		j DONT_MOVE_PINK_PLAYER_WITH_LOG
 		ACTUALLY_MOVE_PINK_PLAYER_WITH_LOG:
 			move $a0, $v0
 			li $a1, 1
 			jal MOVE_PLAYER_WITH_WATER_VEHICLE
 			li $v0, 0
+		DONT_MOVE_PINK_PLAYER_WITH_LOG:
 	FINISH_LOG_CHECK:
-		
-
+	
 	# For each turtle, update the position and check collision against wall
 	li $v0, waterObjectsOfType
 	la $a0, turtlePositionsArray
@@ -105,30 +285,31 @@ UPDATE_NPC_POSITIONS:
 	la $a3, turtleVelCounter
 	jal UPDATE_SINGLE_TYPE_OF_OBJECT
 	
-	# CHECK WHETHER THE TURTLE MOVED ($v1 = 1) AND WHETHER THE PLAYER IS ON A LOG ($v0 = 2)
-	# CHECK WHETHER THE LOG MOVED ($v1 = 1) AND WHETHER THE PLAYER IS ON A LOG ($v0 = 1)
+	# CHECK WHETHER THE TURTLE MOVED ($v1 = 1) AND WHETHER THE PLAYER IS ON A TURTLE ($v0 = 2)
 	beq $v1, 1, TURTLE_MOVED_CHECK_IF_PLAYER_ON
 	j FINISH_TURTLE_CHECK
 	TURTLE_MOVED_CHECK_IF_PLAYER_ON:
 		# Check if blue player was on
 		lw $v0, ($sp)					# Load the old $v0 out of stack
-		beq $v0, 1, ACTUALLY_MOVE_BLUE_PLAYER_WITH_TURTLE
-		j FINISH_TURTLE_CHECK
+		beq $v0, 2, ACTUALLY_MOVE_BLUE_PLAYER_WITH_TURTLE
+		j DONT_MOVE_BLUE_PLAYER_WITH_TURTLE
 		ACTUALLY_MOVE_BLUE_PLAYER_WITH_TURTLE:
 			move $a0, $v0
 			li $a1, 0
 			jal MOVE_PLAYER_WITH_WATER_VEHICLE
 			li $v0, 0
+		DONT_MOVE_BLUE_PLAYER_WITH_TURTLE:
 		
 		# Check if pink player was on
 		lw $v0, 4($sp)					# Load old $v1 out of stack
-		beq $v0, 1, ACTUALLY_MOVE_PINK_PLAYER_WITH_TURTLE
-		j FINISH_TURTLE_CHECK
+		beq $v0, 2, ACTUALLY_MOVE_PINK_PLAYER_WITH_TURTLE
+		j DONT_MOVE_PINK_PLAYER_WITH_TURTLE
 		ACTUALLY_MOVE_PINK_PLAYER_WITH_TURTLE:
 			move $a0, $v0
 			li $a1, 1
 			jal MOVE_PLAYER_WITH_WATER_VEHICLE
 			li $v0, 0
+		DONT_MOVE_PINK_PLAYER_WITH_TURTLE:
 	FINISH_TURTLE_CHECK:
 	
 	free 2
@@ -150,17 +331,18 @@ MOVE_PLAYER_WITH_WATER_VEHICLE:
 	beq $a0, 2, MOVE_PLAYER_WITH_TURTLE
 	DO_NOT_MOVE_PLAYER_WITH_LOG_OR_TURTLE:
 		j MOVE_PLAYER_DECISION_END
-	MOVE_PLAYER_WITH_TURTLE:
-		ternary_2args $a1, 0, la, $t8, bluePlayerPosition, pinkPlayerPosition	# Load addr(playerPosition)
-		lw $t9, ($t8)								# Load playerPosition
-		subiu $t9, $t9, tileTimesPixelConversion				# Move a single pixel to the left
-		sw $t9, ($t8)								# Save that position back into the data
-		
-		j MOVE_PLAYER_DECISION_END
 	MOVE_PLAYER_WITH_LOG:
+		li $t0, tileTimesPixelConversion					# Move a single tile to the right
+
+		j MOVE_PLAYER_WITH_VELOCITY
+	MOVE_PLAYER_WITH_TURTLE:
+		li $t0, -tileTimesPixelConversion						# Move a single tile to the left
+		
+		j MOVE_PLAYER_WITH_VELOCITY
+	MOVE_PLAYER_WITH_VELOCITY:
 		ternary_2args $a1, 0, la, $t8, bluePlayerPosition, pinkPlayerPosition	# Load addr(playerPosition)
 		lw $t9, ($t8)								# Load playerPosition
-		addiu $t9, $t9, tileTimesPixelConversion				# Move a single pixel to the left
+		addu $t9, $t9, $t0							# Move a single pixel to the left
 		sw $t9, ($t8)								# Save that position back into the data
 		
 		j MOVE_PLAYER_DECISION_END
@@ -267,39 +449,43 @@ UPDATE_SINGLE_TYPE_OF_OBJECT:
 	return
 
 # A function to check and handle the collisions for a single player
-#	PARAMS
+#	PARAMS:
 #		$a0 stores the flag of the player. $a0 == 0 is BLUE frog. $a0 == 1 is PINK frog
 CHECK_AND_HANDLE_COLLISIONS:
 	push
+	allocate 1
+	sw $a0, ($sp)
 	
+	# These calls overwrite $a0!!!!
 	jal CHECK_HIT_ROAD_VEHICLES
+	
+	lw $a0, ($sp)
 	jal CHECK_PLAYER_ON_LOG_OR_TURTLE	# Returns a $v0 = 0 if a player is NOT on a log/turtle, 1 if on LOG, 2 if on TURTLE
 	
 	beqz $v0, GOTO_CHECK_PLAYER_IN_WATER
 	DONT_CHECK_PLAYER_IN_WATER:
 		j CHECK_PLAYER_IN_WATER_END
 	GOTO_CHECK_PLAYER_IN_WATER:
+		lw $a0, ($sp)
 		jal CHECK_PLAYER_IN_WATER
 		j CHECK_PLAYER_IN_WATER_END
 	CHECK_PLAYER_IN_WATER_END:
 	
-	# Jumped to when player dies, a "break" statement
-	CHECK_COLLISIONS_DONE:
-	
+	free 1
 	return
 
-# A function for checking if the player is in the water. Assumes that player is NOT on a log/turtle
-#	PARAMS
+# A function for checking if the player is in the water. 
+#	NOTES:
+#		Assumes that player is NOT on a log/turtle
+#	PARAMS:
 #		$a0 stores the flag of the player (0 = blue, 1 = pink)
 CHECK_PLAYER_IN_WATER:
 	push
 	
-	# Load addr(playerPosition)
-	ternary_2args $a0, 0, la, $t0, bluePlayerPosition, pinkPlayerPosition
-	lw $t0, ($t0)				# Load playerPosition
+	# Load playerPosition into $t0
+	ternary_2args $a0, 0, lw, $t0, bluePlayerPosition, pinkPlayerPosition
 	
-	la $t1, safeRegionStart			# Load address of safe region starting point
-	lw $t1, ($t1)				# Load the safe region starting position
+	lw $t1, safeRegionStart			# Load safe region starting point
 	blt $t0, $t1, LESS_THAN_WATER_END
 	j NOT_IN_WATER_BOUNDS
 	LESS_THAN_WATER_END:
@@ -309,7 +495,10 @@ CHECK_PLAYER_IN_WATER:
 		j NOT_IN_WATER_BOUNDS
 		WITHIN_BOTH_BOUNDS:
 			jal PLAYER_DIED
-			j CHECK_COLLISIONS_DONE
+			
+			ternary_2args, $a0, 0, la, $t0, CHECK_BLUE_COLLISIONS_DONE, CHECK_PINK_COLLISIONS_DONE
+			return
+			jr $t0
 	NOT_IN_WATER_BOUNDS:
 	
 	return
@@ -323,24 +512,27 @@ CHECK_PLAYER_IN_WATER:
 #		$v0 == 2 if player was on a TURTLE
 CHECK_PLAYER_ON_LOG_OR_TURTLE:
 	push
+	allocate 1
 	
-	# Load addr(player position)
-	ternary_2args, $a0, 0, la, $t0, bluePlayerPosition, pinkPlayerPosition
-	lw $t0, ($t0)					# Load player position
-	move $a0, $t0					# Move into $a0
-	la $a1, logPositionsArray			# Load positions of the logs 
-	jal CHECK_PLAYER_ON_ONE_TYPE_WATER_VEHICLE	# Check if on log - returns $v0 == 0 if on LOG
+	# Store a local $a0, the player flag
+	sw $a0, ($sp)
 	
-	beq $v0, 0, ON_LOG
-	NOT_ON_LOG:					# If not on a log, check turtle collisions
-		# Load addr(player position)
-		ternary_2args, $a0, 0, la, $t0, bluePlayerPosition, pinkPlayerPosition
-		lw $t0, ($t0)					# Load player position
-		move $a0, $t0					# Move into $a0
-		la $a1, turtlePositionsArray			# Load positions of the turtles 
-		jal CHECK_PLAYER_ON_ONE_TYPE_WATER_VEHICLE	# Check if on turtles - returns $v0 == 0 if on TURTLE
+	# Load playerPosition
+	lw $a0, ($sp)
+	ternary_2args, $a0, 0, lw, $a0, bluePlayerPosition, pinkPlayerPosition
+	la $a1, turtlePositionsArray			# Load positions of the turtles 
+	jal CHECK_PLAYER_ON_ONE_TYPE_WATER_VEHICLE	# Check if on turtles - returns $v0 == 0 if on TURTLE
+	
+	beqz $v0, ON_TURTLE
+	j NOT_ON_TURTLE
+	NOT_ON_TURTLE:					# If not on a log, check turtle collisions
+		# Load playerPosition
+		lw $a0, ($sp)
+		ternary_2args, $a0, 0, lw, $a0, bluePlayerPosition, pinkPlayerPosition
+		la $a1, logPositionsArray			# Load positions of the logs 
+		jal CHECK_PLAYER_ON_ONE_TYPE_WATER_VEHICLE	# Check if on log - returns $v0 == 0 if on LOG
 		
-		beqz $v0, ON_TURTLE				# was on turtle, return 2
+		beqz $v0, ON_LOG				# was on turtle, return 2
 		j NOT_ON_ANY_WATER_VEHICLE			# break and return 0
 	ON_LOG: 
 		li $v0, 1				# return the $v0 = 1
@@ -353,13 +545,14 @@ CHECK_PLAYER_ON_LOG_OR_TURTLE:
 		j MADE_PLAYER_ON_WATER_VEHICLE_DECISION
 	MADE_PLAYER_ON_WATER_VEHICLE_DECISION:
 	
+	free 1
 	return
 
 # A function to check whether or not the player is on a certain type of water vehicle (log or turtle)
-#	PARAMS
+#	PARAMS:
 #		$a0 stores the player's position
 #		$a1 stores the address of the first element in the vehicle position array (e.g. logPositionsArray)
-#	RETURNS
+#	RETURNS:
 # 		$v0 == 0 if the player IS on this type of object, and 1 if the player is NOT on this type of object
 CHECK_PLAYER_ON_ONE_TYPE_WATER_VEHICLE:
 	push
@@ -400,18 +593,24 @@ CHECK_PLAYER_ON_ONE_TYPE_WATER_VEHICLE:
 #		$a0 stores the player's flag (0 = blue, 1 = pink)
 CHECK_HIT_ROAD_VEHICLES:
 	push
-	
+	allocate 1
+		
 	# Load addr(playerPosition)
 	ternary_2args $a0, 0, lw, $t0, bluePlayerPosition, pinkPlayerPosition
+	sw $t0, ($sp)
 	
 	la $a1, carPositionsArray		# Load positions array for cars
-	move $a2, $t0				# Load position into $a2
+	lw $a2, ($sp)				# Load player position into $a2
 	jal CHECK_HIT_ONE_TYPE_ROAD_VEHICLE	# Check if player has collided with a car
 	
+	# Reload the $t0 value
+	lw $t0, ($sp)
+	
 	la $a1, truckPositionsArray		# Load positions array for trucks
-	move $a2, $t0				# Load position into $a2
+	lw $a2, ($sp)				# Load player position into $a2
 	jal CHECK_HIT_ONE_TYPE_ROAD_VEHICLE	# Check if player has collided with a truck
 	
+	free 1
 	return
 
 # A function to check whether or not the player hit a road vehicle of a certain type
@@ -445,7 +644,10 @@ CHECK_HIT_ONE_TYPE_ROAD_VEHICLE:
 			j KILL_END
 		KILL:
 			jal PLAYER_DIED
-			j CHECK_COLLISIONS_DONE
+			
+			ternary_2args $a0, 0, la, $t0, CHECK_BLUE_COLLISIONS_DONE, CHECK_PINK_COLLISIONS_DONE
+			return
+			jr $t0
 		KILL_END:
 	
 		addiu $t0, $t0, 1		# Increment loop counter
@@ -471,63 +673,75 @@ PLAYER_DIED:
 	# Set position
 	sw $t1, ($t0)		# Set position to initial spot
 	
-	# Set lives remaininh
+	# Set lives remaining
 	lw $t1, ($t2)		# Load livesRemaining
 	subi $t1, $t1, 1	# Subtract 1 from livesRemaining
 	sw $t1, ($t2)		# Resave the new value
 	
-	beqz $t1, EXIT
+	lw $t0, bluePlayerLivesRemaining
+	lw $t1, pinkPlayerLivesRemaining
+	add $t0, $t0, $t1
+	beqz $t0, SET_GAME_STATE_TO_GAMEOVER_BOTH
 	
 	return
 
-CHECK_AND_HANDLE_PINK_KEYPRESS:
+SET_GAME_STATE_TO_GAMEOVER_BOTH:
+	push
+	
+	la $t0, gameState
+	li $t1, 5
+	sw $t1, ($t0)
+	j main
+	
+	return
+
+CHECK_AND_HANDLE_KEYPRESSES:
 	push
 	
 	# Check for keypress
 	lw $t8, 0xffff0000
-	la $a0, pinkPlayerDirection			# For changing the direction
-	la $a1, pinkPlayerMoving
-	la $a2, pinkPlayerPosition
-	la $a3, HANDLE_PINK_KEYBOARD_INPUT_DONE		# For exiting from MOVE_X method
-	beq $t8, 0, HANDLE_PINK_KEYBOARD_INPUT_DONE
-	HANDLE_PINK_KEYBOARD_INPUT:
+	beq $t8, 0, HANDLE_KEYBOARD_INPUT_DONE
+	HANDLE_KEYBOARD_INPUT:
 		lw $t2, 0xffff0004
-		beq $t2, 0x69, MOVE_UP		# if key = 'i'
-		beq $t2, 0x6A, MOVE_LEFT	# if key = 'j'
-		beq $t2, 0x6B, MOVE_DOWN	# if key = 'k'
-		beq $t2, 0x6C, MOVE_RIGHT	# if key = 'l'
-		j HANDLE_PINK_KEYBOARD_INPUT_DONE
-	HANDLE_PINK_KEYBOARD_NO_INPUT:
-		# Reset player moving back to 0
-		la $t1, pinkPlayerMoving
-		sw $zero, ($t1)
-	HANDLE_PINK_KEYBOARD_INPUT_DONE:
-	
-	return
-
-CHECK_AND_HANDLE_BLUE_KEYPRESS:
-	push
-	
-	# Check for keypress
-	lw $t8, 0xffff0000
-	la $a0, bluePlayerDirection			# For changing the direction
-	la $a1, bluePlayerMoving
-	la $a2, bluePlayerPosition
-	la $a3, HANDLE_BLUE_KEYBOARD_INPUT_DONE		# For exiting from MOVE_X method
-	beq $t8, 0, HANDLE_BLUE_KEYBOARD_INPUT_DONE
-	HANDLE_BLUE_KEYBOARD_INPUT:
-		lw $t2, 0xffff0004
-		beq $t2, 0x77, MOVE_UP		# if key = 'w'
-		beq $t2, 0x61, MOVE_LEFT	# if key = 'a'
-		beq $t2, 0x73, MOVE_DOWN	# if key = 's'
-		beq $t2, 0x64, MOVE_RIGHT	# if key = 'd'
-		j HANDLE_BLUE_KEYBOARD_INPUT_DONE
-	HANDLE_BLUE_KEYBOARD_NO_INPUT:
+		
+		lw $t0, bluePlayerLivesRemaining
+		beqz $t0, SKIP_BLUE_PLAYER_KEYPRESSES 
+		# Load blue data
+		la $a0, bluePlayerDirection			# For changing the direction
+		la $a1, bluePlayerMoving
+		la $a2, bluePlayerPosition
+		
+		# Check blue keys
+		beq $t2, 0x77, MOVE_UP				# if key = 'w'
+		beq $t2, 0x61, MOVE_LEFT			# if key = 'a'
+		beq $t2, 0x73, MOVE_DOWN			# if key = 's'
+		beq $t2, 0x64, MOVE_RIGHT			# if key = 'd'
+		
+		SKIP_BLUE_PLAYER_KEYPRESSES:
+		
+		lw $t0, pinkPlayerLivesRemaining
+		beqz $t0, SKIP_PINK_PLAYER_KEYPRESSES 
+		# Load pink data
+		la $a0, pinkPlayerDirection			# For changing the direction
+		la $a1, pinkPlayerMoving
+		la $a2, pinkPlayerPosition
+		
+		# Check pink keys
+		beq $t2, 0x69, MOVE_UP				# if key = 'i'
+		beq $t2, 0x6A, MOVE_LEFT			# if key = 'j'
+		beq $t2, 0x6B, MOVE_DOWN			# if key = 'k'
+		beq $t2, 0x6C, MOVE_RIGHT			# if key = 'l'
+		
+		SKIP_PINK_PLAYER_KEYPRESSES:
+		
+		j HANDLE_KEYBOARD_INPUT_DONE
+	HANDLE_KEYBOARD_NO_INPUT:
 		# Reset player moving back to 0
 		la $t1, bluePlayerMoving
+		la $t2, pinkPlayerMoving
 		sw $zero, ($t1)
-	HANDLE_BLUE_KEYBOARD_INPUT_DONE:
-		
+		sw $zero, ($t2)
+	HANDLE_KEYBOARD_INPUT_DONE:
 	
 	return
 
@@ -542,10 +756,9 @@ CHECK_AND_HANDLE_BLUE_KEYPRESS:
 MOVE_UP:
 	sw $zero, ($a0)			# Set playerDirection = 0
 
-	lw $t4, movementAmountUp
-	move $a0, $t4
+	lw $a0, movementAmountUp
 	jal MOVE_PLAYER
-	jr $a3
+	j HANDLE_KEYBOARD_INPUT_DONE
 
 # Move the player down a pixel
 #	PARAMS:
@@ -559,10 +772,9 @@ MOVE_DOWN:
 	li $t3, 2	
 	sw $t3, ($a0)			# Set playerDirection = 2
 
-	lw $t4, movementAmountDown
-	move $a0, $t4
+	lw $a0, movementAmountDown
 	jal MOVE_PLAYER
-	jr $a3
+	j HANDLE_KEYBOARD_INPUT_DONE
 
 # Move the player right a pixel
 #	PARAMS:
@@ -578,12 +790,14 @@ MOVE_RIGHT:
 
 	li $a0, tileTimesPixelConversion
 	jal MOVE_PLAYER
-	jr $a3
+	j HANDLE_KEYBOARD_INPUT_DONE
 
 # Move the player left a tile
 #	PARAMS:
 #		$a0 stores the addr(playerDirection) for the given player (blue or pink)
-#		$a2 stores the address of the label to exit to when movement is done
+#		$a1 stores the addr(playerMoving) for the given player (blue or pink)
+#		$a2 stores the addr(playerPosition) for the given player (blue or pink)
+#		$a3 stores the address of the label to exit to when movement is done
 #	JUMPS:
 #		Back into CHECK_AND_HANDLE_KEYPRESS
 MOVE_LEFT:
@@ -592,7 +806,7 @@ MOVE_LEFT:
 
 	li $a0, -tileTimesPixelConversion
 	jal MOVE_PLAYER
-	jr $a3
+	j HANDLE_KEYBOARD_INPUT_DONE
 	
 # Move the player by a pixel offset
 #	PARAMS:
@@ -604,11 +818,17 @@ MOVE_LEFT:
 MOVE_PLAYER:
 	push
 	
-	li $t2, 1		# Set $t2 = 1
-	sw $t2, ($a1) 		# Set player moving to 1
-
-	lw $t2, ($a2)		# Load playerPosition
-	add $t2, $t2, $a0	# Move a single tile in specified direction
-	sw $t2, ($a2)		# Save that position back into the data
+	lw $t0, ($a2)				# Load playerPosition
+	li $t1, width
+	
+	ALLOW_PLAYER_MOVEMENT:
+		li $t2, 1				# Set $t2 = 1
+		sw $t2, ($a1) 				# Set player moving to 1
+	
+		add $t0, $t0, $a0			# Move a single tile in specified direction
+		sw $t0, ($a2)				# Save that position back into the data
+		j PLAYER_MOVEMENT_DECISION_END
+	PLAYER_MOVEMENT_DECISION_END:
+	
 	
 	return
